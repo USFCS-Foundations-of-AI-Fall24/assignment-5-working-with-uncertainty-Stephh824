@@ -64,14 +64,37 @@ class HMM:
         curr_state = random.choices(list(self.transitions["#"].keys()), [float(item) for item in self.transitions["#"].values()])[0]
         for i in range(0, n) :
             curr_emit = random.choices(list(self.emissions[curr_state].keys()), [float(item) for item in self.emissions[curr_state].values()])[0]
-            obs.append((curr_state, curr_emit))
+            obs.append(curr_emit)
             curr_state = random.choices(list(self.transitions[curr_state].keys()), [float(item) for item in self.transitions[curr_state].values()])[0]
         return obs
 
     def forward(self, sequence):
-        pass
-    ## you do this: Implement the Viterbi algorithm. Given a Sequence with a list of emissions,
-    ## determine the most likely sequence of states.
+        # Initializing a matrix with sequence + 1 columns to account for sequence and #
+        # and with transitions["#"].keys() + 1 rows to account for starting states and "#"
+        matrix = [[float(0) for j in range(len(sequence) + 1)] for i in range(len(self.transitions["#"].keys()) + 1)]
+        matrix[0][0] = 1
+        # Iterating through columns -> sequence
+        for i in range(1, len(sequence) + 1):
+            if i == 1 :
+                # For initial step since it's not reliant on previous state, only probability of start state
+                for idx, state in enumerate(self.transitions["#"].keys()):
+                    # Probability = P(observation | state) -> the emission probability *
+                    #               P(state | "#") -> the start state probability *
+                    #               P("#") -> always 1.0
+                    prob = float(self.emissions[state][sequence[i - 1]]) * float(self.transitions["#"][state])
+                    matrix[idx + 1][i] = prob
+            else :
+                # Iterating through rows -> "#", "happy", "grumpy", "hungry"
+                for idx1, state in enumerate(self.transitions["#"].keys()) :
+                    prob = 0
+                    # Iterating through states again for prev_state accessibility
+                    for idx2, state2 in enumerate(self.transitions["#"].keys()) :
+                        # Probability = P(observation | state) -> the emission probability *
+                        #               P(state | prev_state) -> the transition probability *
+                        #               P(prev_state) -> the previous row entry in the matrix
+                        prob += matrix[idx2 + 1][i-1] * float(self.transitions[state2][state]) * float(self.emissions[state][sequence[i-1]])
+                    matrix[idx1 + 1][i] = prob
+        return matrix
 
     def viterbi(self, sequence):
         pass
@@ -86,12 +109,30 @@ if __name__ == "__main__" :
                     prog = 'HMM.py',
                     description = 'Performs Hidden Markov Models on a sequence of states')
     parser.add_argument('basename', help = "The basename of the .emit and .trans file to process")
-    parser.add_argument('--generate', action = "store_true", help = "Generate a random sequence with N random observations")
+    parser.add_argument('--generate', metavar = "N", help = "Generates a random sequence with N random observations")
+    parser.add_argument('--forward', metavar = "outfile", help = "Runs the forward algorithm on the observations in this file, if given a file that doesn't exist, will create one with default 30 observations")
     args = parser.parse_args()
 
+# If both generate and forward, do generate write to a file
+# and then do forward on that file
+# If just forward, auto-generate a 20 n sequence
+# If just generate -> generate
     h = HMM()
-    h.load(args.basename)
-    print(h.generate(20))
-
-
-
+    if args.generate :
+        with open(args.basename + "_sequence.obs", 'w') as f :
+            h.load(args.basename)
+            toks = " ".join(h.generate(int(args.generate)))
+            f.write(toks)
+    if args.forward :
+        if Path(args.forward).is_file() :
+            h.load(args.basename)
+            with open(args.forward) as f :
+                lines = f.readlines()
+                lines = " ".join(lines).split(' ')
+            print(h.forward(lines))
+        else :
+            with open(args.forward, 'w') as f :
+                h.load(args.basename)
+                toks = " ".join(h.generate(30))
+                f.write(toks)
+            h.forward(args.forward)
