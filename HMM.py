@@ -122,7 +122,10 @@ class HMM:
                     # Probability = P(observation | state) -> the emission probability *
                     #               P(state | "#") -> the start state probability *
                     #               P("#") -> always 1.0
-                    prob = float(self.emissions[state][sequence[i - 1]]) * float(self.transitions["#"][state])
+                    try:
+                        prob = float(self.emissions[state][sequence[i - 1]]) * float(self.transitions["#"][state])
+                    except KeyError:
+                        prob = 0
                     matrix[idx + 1][i] = prob
             else:
             # Iterating through rows (states) -> "#", "happy", "grumpy", "hungry"
@@ -130,7 +133,10 @@ class HMM:
                     max_prob = 0
                     # Iterating through states again for prev_state accessibility
                     for idx2, state2 in enumerate(self.transitions["#"].keys()):
-                        curr_prob = matrix[idx2 + 1][i - 1] * float(self.transitions[state2][state]) * float(self.emissions[state][sequence[i - 1]])
+                        try :
+                            curr_prob = matrix[idx2 + 1][i - 1] * float(self.transitions[state2][state]) * float(self.emissions[state][sequence[i - 1]])
+                        except KeyError:
+                            curr_prob = 0
                         if curr_prob > max_prob:
                             max_prob = curr_prob
                             backpointers[idx1+1][i] = idx2 + 1
@@ -141,7 +147,7 @@ class HMM:
         last_column = len(matrix[0]) - 1
         # Finds the initial minimum value from the last column
         for idx, row in enumerate(backpointers[1:]):
-            if row[last_column] < min_value:
+            if (row[last_column] != 0) and row[last_column] < min_value:
                 min_value = row[last_column]
                 min_row = idx + 1
         # Both value and row get added because value doesn't give us which row the last value occurred at
@@ -152,13 +158,12 @@ class HMM:
             last_column -= 1
             min_value = int(backpointers[int(min_value)][last_column])
             states.append(min_value)
-
         states.reverse()
         emits = []
         # Ignoring the 0 as it tells us nothing, the entire first (second(?)) row is all zeros
-        #for state in states[1:] :
-
-
+        for state in states[1:] :
+            emits.append(list(self.transitions["#"].keys())[state - 1])
+        print(emits)
 
 
     ## You do this. Given a sequence with a list of emissions, fill in the most likely
@@ -206,4 +211,5 @@ if __name__ == "__main__" :
                     if len(line) != 1:
                         lines = line.split(" ")
                         tokens = [item.rstrip('\n') for item in lines if item != ('' or '\n')]
+                        print(tokens)
                         h.viterbi(tokens)
