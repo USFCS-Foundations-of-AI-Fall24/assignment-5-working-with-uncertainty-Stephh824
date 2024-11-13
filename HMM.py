@@ -81,6 +81,7 @@ class HMM:
                     #               P("#") -> always 1.0
                     try:
                         prob = float(self.emissions[state][sequence[i - 1]]) * float(self.transitions["#"][state])
+                        # if KeyError, means transition or emission is not reachable therefore is 0
                     except KeyError:
                         # Means no transitions or emission exists
                         prob = 0
@@ -96,6 +97,7 @@ class HMM:
                         #               P(prev_state) -> the previous row entry in the matrix
                         try:
                             prob += matrix[idx2 + 1][i-1] * float(self.transitions[state2][state]) * float(self.emissions[state][sequence[i-1]])
+                        # if KeyError, means transition or emission is not reachable therefore is 0
                         except KeyError:
                             prob += 0
                     matrix[idx1 + 1][i] = prob
@@ -106,7 +108,6 @@ class HMM:
                 max_val = row[len(row) - 1]
                 max_idx = idx
         return list(self.transitions["#"].keys())[max_idx - 1]
-
 
     def viterbi(self, sequence):
         # Initializing a matrix with sequence + 1 columns to account for sequence and #
@@ -124,6 +125,7 @@ class HMM:
                     #               P("#") -> always 1.0
                     try:
                         prob = float(self.emissions[state][sequence[i - 1]]) * float(self.transitions["#"][state])
+                    # if KeyError, means transition or emission is not reachable therefore is 0
                     except KeyError:
                         prob = 0
                     matrix[idx + 1][i] = prob
@@ -135,6 +137,7 @@ class HMM:
                     for idx2, state2 in enumerate(self.transitions["#"].keys()):
                         try :
                             curr_prob = matrix[idx2 + 1][i - 1] * float(self.transitions[state2][state]) * float(self.emissions[state][sequence[i - 1]])
+                        # if KeyError, means transition or emission is not reachable therefore is 0
                         except KeyError:
                             curr_prob = 0
                         if curr_prob > max_prob:
@@ -163,11 +166,25 @@ class HMM:
         # Ignoring the 0 as it tells us nothing, the entire first (second(?)) row is all zeros
         for state in states[1:] :
             emits.append(list(self.transitions["#"].keys())[state - 1])
-        print(emits)
+        return emits
 
-
-    ## You do this. Given a sequence with a list of emissions, fill in the most likely
-    ## hidden states using the Viterbi algorithm.
+def validate(basename, file, type) :
+    h = HMM()
+    h.load(basename)
+    if not Path(file).is_file() :
+        with open(file, 'w') as f:
+            toks = " ".join(h.generate(20))
+            f.write(toks)
+    with open(file) as f :
+        for line in f :
+            if len(line) != 1 :
+                lines = line.split(" ")
+                tokens = [item.rstrip('\n') for item in lines if item != ('' or '\n')]
+                match type :
+                    case "forward" :
+                        print(f"The most likely current state is %s" % h.forward(tokens))
+                    case "viterbi" :
+                        print(f"The most likely sequence of hidden states for the sequence of observations \"%s\" is \"%s\"" % (" ".join(tokens), " ".join(h.viterbi(tokens))))
 
 
 if __name__ == "__main__" :
@@ -177,39 +194,42 @@ if __name__ == "__main__" :
                     description = 'Performs Hidden Markov Models on a sequence of states')
     parser.add_argument('basename', help = "The basename of the .emit and .trans file to process")
     parser.add_argument('--generate', metavar = "N", help = "Generates a random sequence with N random observations")
-    parser.add_argument('--forward', metavar = "outfile", help = "Runs the Forward Algorithm on the observations in this file, if given a file that doesn't exist, will create one with default 30 observations")
-    parser.add_argument('--viterbi', metavar = "outfile", help = "Runs the Viterbi Algorithm on the observations in this file, if given a file that doesn't exist, will create one with default 30 observations")
+    parser.add_argument('--forward', metavar = "outfile", help = "Runs the Forward Algorithm on the observations in this file, if given a file that doesn't exist, will create one with default 20 observations")
+    parser.add_argument('--viterbi', metavar = "outfile", help = "Runs the Viterbi Algorithm on the observations in this file, if given a file that doesn't exist, will create one with default 20 observations")
     args = parser.parse_args()
 
 
-    h = HMM()
-    if args.generate :
-        with open(args.basename + "_sequence.obs", 'w') as f :
-            h.load(args.basename)
-            toks = " ".join(h.generate(int(args.generate)))
-            f.write(toks)
-    if args.forward:
-        if Path(args.forward).is_file() :
-            h.load(args.basename)
-            with open(args.forward) as f :
-                for line in f :
-                    if len(line) != 1:
-                        lines = line.split(" ")
-                        tokens = [item.rstrip('\n') for item in lines if item != ('' or '\n')]
-                        print(f"The most likely current state is %s" % h.forward(tokens))
-        else :
-            with open(args.forward, 'w') as f :
-                h.load(args.basename)
-                toks = " ".join(h.generate(30))
-                f.write(toks)
-            h.forward(args.forward)
+    if args.forward :
+        validate(args.basename, args.forward, "forward")
     if args.viterbi :
-        if Path(args.viterbi).is_file() :
-            h.load(args.basename)
-            with open(args.viterbi) as f :
-                for line in f :
-                    if len(line) != 1:
-                        lines = line.split(" ")
-                        tokens = [item.rstrip('\n') for item in lines if item != ('' or '\n')]
-                        print(tokens)
-                        h.viterbi(tokens)
+        validate(args.basename, args.viterbi, "viterbi")
+    # if args.generate :
+    #     with open(args.basename + "_sequence.obs", 'w') as f :
+    #         h.load(args.basename)
+    #         toks = " ".join(h.generate(int(args.generate)))
+    #         f.write(toks)
+    # if args.forward:
+    #     if Path(args.forward).is_file() :
+    #         h.load(args.basename)
+    #         with open(args.forward) as f :
+    #             for line in f :
+    #                 if len(line) != 1:
+    #                     lines = line.split(" ")
+    #                     tokens = [item.rstrip('\n') for item in lines if item != ('' or '\n')]
+    #                     print(f"The most likely current state is %s" % h.forward(tokens))
+    #     else :
+    #         with open(args.forward, 'w') as f :
+    #             h.load(args.basename)
+    #             toks = " ".join(h.generate(30))
+    #             f.write(toks)
+    #         h.forward(args.forward)
+    # if args.viterbi :
+    #     if Path(args.viterbi).is_file() :
+    #         h.load(args.basename)
+    #         with open(args.viterbi) as f :
+    #             for line in f :
+    #                 if len(line) != 1:
+    #                     lines = line.split(" ")
+    #                     tokens = [item.rstrip('\n') for item in lines if item != ('' or '\n')]
+    #                     print(tokens)
+    #                     h.viterbi(tokens)
