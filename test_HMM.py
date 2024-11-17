@@ -16,4 +16,24 @@ class MyTestCase(TestCase):
                       "hungry" : {"happy" : "0.1", "grumpy" : "0.6", "hungry" : "0.3"}})
         self.assertEqual(h.transitions, tdict)
 
+    def test_forward(self) :
+        # Taken from example given during class (on slides)
+        seq = ["purr", "silent", "silent", "meow", "meow"]
+        h = HMM()
+        h.load("cat")
+        likely_state = h.forward(seq)
+        self.assertEqual(likely_state, "hungry")
 
+    def test_viterbi(self) :
+        # Taken from ambiguous_sents.tagged.obs (both sequence and expected states)
+        seq = ["i", "shot", "the", "elephant", "."]
+        h = HMM()
+        h.load("partofspeech")
+        likely_states = h.viterbi(seq)
+        self.assertEqual(likely_states, ["PRON", "VERB", "DET", "NOUN", "."])
+
+        # Taken from example given during class (on slides)
+        seq = ["purr", "silent", "silent", "meow", "meow"]
+        h.load("cat")
+        likely_states = h.viterbi(seq)
+        self.assertEqual(likely_states, ["happy", "hungry", "grumpy", "happy", "happy"])
